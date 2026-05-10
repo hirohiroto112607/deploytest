@@ -1,0 +1,108 @@
+name: Deploy to Home Cluster
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+    inputs:
+      target:
+        description: 'Deploy target (all / aquos / pixel7a / tone)'
+        required: false
+        default: 'aquos'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    outputs:
+      artifact-name: ${{ steps.set-name.outputs.name }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: 'npm'
+
+      - run: npm ci
+      - run: npm run build
+
+      - id: set-name
+        run: echo "name=nextjs-build-${{ github.sha }}" >> $GITHUB_OUTPUT
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: ${{ steps.set-name.outputs.name }}
+          path: |
+            .next/
+            public/
+            package.json
+            package-lock.json
+          retention-days: 1
+
+  deploy:
+    needs: build
+    runs-on: ubuntu-latest
+    strategy:
+      matrix:
+        include:
+          - name: aquos
+            host: 100.89.12.118
+            label: AQUOS Sense3
+          - name: pixel7a
+            host: 100.87.78.4
+            label: Pixel 7a
+          - name: tone
+            host: 100.125.51.5
+            label: TONE e19
+
+    steps:
+      # ターゲット指定フィルタリング
+      - name: Check target
+        id: check
+        run: |
+          TARGET="${{ github.event.inputs.target || 'all' }}"
+          if [[ "$TARGET" == "all" || "$TARGET" == "${{ matrix.name }}" ]]; then
+            echo "skip=false" >> $GITHUB_OUTPUT
+          else
+            echo "skip=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Setup Tailscale
+        if: steps.check.outputs.skip == 'false'
+        uses: tailscale/github-action@v2
+        with:
+          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
+          args: --accept-routes
+
+      - uses: actions/download-artifact@v4
+        if: steps.check.outputs.skip == 'false'
+        with:
+          name: ${{ needs.build.outputs.artifact-name }}
+          path: ./dist
+
+      - name: Setup SSH
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          mkdir -p ~/.ssh
+          echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
+          chmod 600 ~/.ssh/deploy_key
+          ssh-keyscan -H ${{ matrix.host }} >> ~/.ssh/known_hosts 2>/dev/null || true
+
+      - name: Deploy to ${{ matrix.label }}
+        if: steps.check.outputs.skip == 'false'
+        run: |
+          # ビルド成果物を転送
+          rsync -avz --delete \
+            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            ./dist/ \
+            user@${{ matrix.host }}:~/apps/GreetingBadge/
+
+          # リモートでpm2再起動
+          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+            user@${{ matrix.host }} \
+            "cd ~/apps/GreetingBadge && npm ci --production --ignore-scripts && pm2 restart GreetingBadge || pm2 start npm --name GreetingBadge -- start"
+
+      - name: Notify result
+        if: always() && steps.check.outputs.skip == 'false'
+        run: |
+          echo "## ${{ matrix.label }}: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
