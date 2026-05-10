@@ -19,7 +19,7 @@ jobs:
       - id: gen
         shell: bash
         run: |
-          TARGET="${{ github.event.inputs.target || 'all' }}"
+          TARGET="${{ github.event.inputs.target || 'aquos' }}"
 
           AQUOS='{"name":"aquos","host":"100.89.12.118","port":"8022","label":"AQUOS Sense3"}'
           PIXEL='{"name":"pixel7a","host":"100.87.78.4","port":"8022","label":"Pixel 7a"}'
@@ -34,52 +34,20 @@ jobs:
 
           echo "matrix={\"include\":$MATRIX}" >> "$GITHUB_OUTPUT"
 
-  build:
-    runs-on: ubuntu-latest
-    outputs:
-      artifact-name: ${{ steps.set-name.outputs.name }}
-    steps:
-      - uses: actions/checkout@v4
-
-      - uses: actions/setup-node@v4
-        with:
-          node-version: "20"
-          cache: "npm"
-
-      - run: npm ci
-      - run: npm run build
-
-      - id: set-name
-        run: echo "name=nextjs-build-${{ github.sha }}" >> "$GITHUB_OUTPUT"
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: ${{ steps.set-name.outputs.name }}
-          path: |
-            .next/
-            public/
-            package.json
-            package-lock.json
-          include-hidden-files: true
-          retention-days: 1
-
   deploy:
-    needs: [prepare, build]
+    needs: prepare
     runs-on: ubuntu-latest
     strategy:
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
       fail-fast: false
     steps:
+      - uses: actions/checkout@v4
+
       - name: Setup Tailscale
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
           args: "--accept-routes"
-
-      - uses: actions/download-artifact@v4
-        with:
-          name: ${{ needs.build.outputs.artifact-name }}
-          path: ./dist
 
       - name: Setup SSH
         run: |
@@ -88,18 +56,23 @@ jobs:
           chmod 600 ~/.ssh/deploy_key
           ssh-keyscan -p ${{ matrix.port }} -H ${{ matrix.host }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
-      - name: Deploy to ${{ matrix.label }}
+      - name: Transfer source to ${{ matrix.label }}
         run: |
           rsync -avz --delete \
+            --exclude='.git/' \
+            --exclude='node_modules/' \
+            --exclude='.next/' \
             -e "ssh -i ~/.ssh/deploy_key -p ${{ matrix.port }} -o StrictHostKeyChecking=no" \
-            ./dist/ \
+            ./ \
             user@${{ matrix.host }}:~/apps/GreetingBadge/
 
+      - name: Build and restart on ${{ matrix.label }}
+        run: |
           ssh -i ~/.ssh/deploy_key -p ${{ matrix.port }} -o StrictHostKeyChecking=no \
             user@${{ matrix.host }} \
             "cd ~/apps/GreetingBadge \
-              && ls -la .next 2>/dev/null || echo '[ERROR] .next missing' \
-              && npm ci --production --ignore-scripts \
+              && npm ci \
+              && PORT=3001 npm run build \
               && if pm2 describe GreetingBadge > /dev/null 2>&1; then \
                    PORT=3001 pm2 restart GreetingBadge --update-env; \
                  else \
