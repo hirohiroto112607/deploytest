@@ -96,7 +96,7 @@ jobs:
 
           ssh -i ~/.ssh/deploy_key -p ${{ matrix.port }} -o StrictHostKeyChecking=no \
             user@${{ matrix.host }} \
-            "cd ~/apps/GreetingBadge && npm ci --production --ignore-scripts && pm2 restart GreetingBadge || pm2 start npm --name GreetingBadge -- start"
+            "cd ~/apps/GreetingBadge && npm ci --production --ignore-scripts && PORT=3001 pm2 restart GreetingBadge --update-env || PORT=3001 pm2 start npm --name GreetingBadge -- start"
 
       - name: Write summary
         if: always()
