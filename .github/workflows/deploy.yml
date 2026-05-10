@@ -11,6 +11,30 @@ on:
         default: 'aquos'
 
 jobs:
+  # ── ① ターゲットに応じてmatrixを動的生成 ──────────────────
+  prepare:
+    runs-on: ubuntu-latest
+    outputs:
+      matrix: ${{ steps.gen.outputs.matrix }}
+    steps:
+      - id: gen
+        run: |
+          TARGET="${{ github.event.inputs.target || 'all' }}"
+
+          AQUOS='{"name":"aquos",   "host":"100.89.12.118", "port":"8022", "label":"AQUOS Sense3"}'
+          PIXEL='{"name":"pixel7a", "host":"100.87.78.4",   "port":"8022", "label":"Pixel 7a"}'
+          TONE='{"name":"tone",    "host":"100.125.51.5",  "port":"2022", "label":"TONE e19"}'
+
+          case "$TARGET" in
+            aquos)   MATRIX="[$AQUOS]" ;;
+            pixel7a) MATRIX="[$PIXEL]" ;;
+            tone)    MATRIX="[$TONE]" ;;
+            *)       MATRIX="[$AQUOS,$PIXEL,$TONE]" ;;
+          esac
+
+          echo "matrix={\"include\":$MATRIX}" >> $GITHUB_OUTPUT
+
+  # ── ② ビルド ──────────────────────────────────────────────
   build:
     runs-on: ubuntu-latest
     outputs:
@@ -39,70 +63,44 @@ jobs:
             package-lock.json
           retention-days: 1
 
+  # ── ③ デプロイ（指定端末のみジョブが起動） ────────────────
   deploy:
-    needs: build
+    needs: [prepare, build]
     runs-on: ubuntu-latest
     strategy:
-      matrix:
-        include:
-          - name: aquos
-            host: 100.89.12.118
-            label: AQUOS Sense3
-          - name: pixel7a
-            host: 100.87.78.4
-            label: Pixel 7a
-          - name: tone
-            host: 100.125.51.5
-            label: TONE e19
+      matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
+      fail-fast: false  # 1台失敗しても他は続行
 
     steps:
-      # ターゲット指定フィルタリング
-      - name: Check target
-        id: check
-        run: |
-          TARGET="${{ github.event.inputs.target || 'all' }}"
-          if [[ "$TARGET" == "all" || "$TARGET" == "${{ matrix.name }}" ]]; then
-            echo "skip=false" >> $GITHUB_OUTPUT
-          else
-            echo "skip=true" >> $GITHUB_OUTPUT
-          fi
-
       - name: Setup Tailscale
-        if: steps.check.outputs.skip == 'false'
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
           args: --accept-routes
 
       - uses: actions/download-artifact@v4
-        if: steps.check.outputs.skip == 'false'
         with:
           name: ${{ needs.build.outputs.artifact-name }}
           path: ./dist
 
       - name: Setup SSH
-        if: steps.check.outputs.skip == 'false'
         run: |
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -H ${{ matrix.host }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -p ${{ matrix.port }} -H ${{ matrix.host }} >> ~/.ssh/known_hosts 2>/dev/null || true
 
       - name: Deploy to ${{ matrix.label }}
-        if: steps.check.outputs.skip == 'false'
         run: |
-          # ビルド成果物を転送
           rsync -avz --delete \
-            -e "ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no" \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ matrix.port }} -o StrictHostKeyChecking=no" \
             ./dist/ \
             user@${{ matrix.host }}:~/apps/GreetingBadge/
 
-          # リモートでpm2再起動
-          ssh -i ~/.ssh/deploy_key -o StrictHostKeyChecking=no \
+          ssh -i ~/.ssh/deploy_key -p ${{ matrix.port }} -o StrictHostKeyChecking=no \
             user@${{ matrix.host }} \
             "cd ~/apps/GreetingBadge && npm ci --production --ignore-scripts && pm2 restart GreetingBadge || pm2 start npm --name GreetingBadge -- start"
 
-      - name: Notify result
-        if: always() && steps.check.outputs.skip == 'false'
-        run: |
-          echo "## ${{ matrix.label }}: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+      - name: Write summary
+        if: always()
+        run: echo "## ${{ matrix.label }}: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
