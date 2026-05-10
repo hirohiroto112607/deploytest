@@ -6,24 +6,24 @@ on:
   workflow_dispatch:
     inputs:
       target:
-        description: 'Deploy target (all / aquos / pixel7a / tone)'
+        description: "Deploy target (all / aquos / pixel7a / tone)"
         required: false
-        default: 'aquos'
+        default: "all"
 
 jobs:
-  # ── ① ターゲットに応じてmatrixを動的生成 ──────────────────
   prepare:
     runs-on: ubuntu-latest
     outputs:
       matrix: ${{ steps.gen.outputs.matrix }}
     steps:
       - id: gen
+        shell: bash
         run: |
           TARGET="${{ github.event.inputs.target || 'all' }}"
 
-          AQUOS='{"name":"aquos",   "host":"100.89.12.118", "port":"8022", "label":"AQUOS Sense3"}'
-          PIXEL='{"name":"pixel7a", "host":"100.87.78.4",   "port":"8022", "label":"Pixel 7a"}'
-          TONE='{"name":"tone",    "host":"100.125.51.5",  "port":"2022", "label":"TONE e19"}'
+          AQUOS='{"name":"aquos","host":"100.89.12.118","port":"8022","label":"AQUOS Sense3"}'
+          PIXEL='{"name":"pixel7a","host":"100.87.78.4","port":"8022","label":"Pixel 7a"}'
+          TONE='{"name":"tone","host":"100.125.51.5","port":"2022","label":"TONE e19"}'
 
           case "$TARGET" in
             aquos)   MATRIX="[$AQUOS]" ;;
@@ -32,9 +32,8 @@ jobs:
             *)       MATRIX="[$AQUOS,$PIXEL,$TONE]" ;;
           esac
 
-          echo "matrix={\"include\":$MATRIX}" >> $GITHUB_OUTPUT
+          echo "matrix={\"include\":$MATRIX}" >> "$GITHUB_OUTPUT"
 
-  # ── ② ビルド ──────────────────────────────────────────────
   build:
     runs-on: ubuntu-latest
     outputs:
@@ -44,14 +43,14 @@ jobs:
 
       - uses: actions/setup-node@v4
         with:
-          node-version: '20'
-          cache: 'npm'
+          node-version: "20"
+          cache: "npm"
 
       - run: npm ci
       - run: npm run build
 
       - id: set-name
-        run: echo "name=nextjs-build-${{ github.sha }}" >> $GITHUB_OUTPUT
+        run: echo "name=nextjs-build-${{ github.sha }}" >> "$GITHUB_OUTPUT"
 
       - uses: actions/upload-artifact@v4
         with:
@@ -63,20 +62,18 @@ jobs:
             package-lock.json
           retention-days: 1
 
-  # ── ③ デプロイ（指定端末のみジョブが起動） ────────────────
   deploy:
     needs: [prepare, build]
     runs-on: ubuntu-latest
     strategy:
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
-      fail-fast: false  # 1台失敗しても他は続行
-
+      fail-fast: false
     steps:
       - name: Setup Tailscale
         uses: tailscale/github-action@v2
         with:
           authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          args: --accept-routes
+          args: "--accept-routes"
 
       - uses: actions/download-artifact@v4
         with:
@@ -103,4 +100,4 @@ jobs:
 
       - name: Write summary
         if: always()
-        run: echo "## ${{ matrix.label }}: ${{ job.status }}" >> $GITHUB_STEP_SUMMARY
+        run: echo "## ${{ matrix.label }} ${{ job.status }}" >> "$GITHUB_STEP_SUMMARY"
