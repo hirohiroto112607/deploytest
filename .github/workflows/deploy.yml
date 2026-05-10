@@ -8,7 +8,7 @@ on:
       target:
         description: "Deploy target (all / aquos / pixel7a / tone)"
         required: false
-        default: "all"
+        default: "aquos"
 
 jobs:
   prepare:
