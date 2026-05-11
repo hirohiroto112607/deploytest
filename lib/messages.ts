@@ -84,3 +84,11 @@ export function formatTime(date: Date): string {
 	const minutes = String(date.getMinutes()).padStart(2, "0");
 	return `${hours}:${minutes}`;
 }
+
+export function formatDate(date: Date): string {
+	const days = ["日", "月", "火", "水", "木", "金", "土"];
+	const month = date.getMonth() + 1;
+	const day = date.getDate();
+	const dayOfWeek = days[date.getDay()];
+	return `${month}月${day}日 (${dayOfWeek})`;
+}

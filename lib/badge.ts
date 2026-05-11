@@ -1,4 +1,4 @@
-import { formatTime, getGreeting, getIcon, getRandomMessage } from "./messages";
+import { formatDate, formatTime, getGreeting, getIcon, getRandomMessage } from "./messages";
 
 interface BadgeOptions {
 	hour: number;
@@ -15,9 +15,10 @@ export function generateBadge(options: BadgeOptions): string {
 	const message = getRandomMessage(hour);
 	const time = formatTime(now);
 
-	const width = 600;
+	const date = formatDate(now);
+	const width = 800;
 	const height = 160;
-	const messageMaxChars = 24;
+	const messageMaxChars = 36;
 	const messageLines = clampLines(
 		wrapTextByChar(message, messageMaxChars),
 		2,
@@ -47,9 +48,8 @@ export function generateBadge(options: BadgeOptions): string {
 		greeting,
 	)}</text>
   ${messageText}
-  <text x="32" y="146" font-size="16" fill="rgba(255, 255, 255, 0.7)" font-family="${fontFamily}">${escapeXml(
-		`${time} (JST)`,
-	)}</text>
+  <text x="32" y="146" font-size="16" fill="rgba(255, 255, 255, 0.7)" font-family="${fontFamily}">${escapeXml(`${time} (JST)`)}</text>
+  <text x="${width - 24}" y="146" font-size="16" fill="rgba(255, 255, 255, 0.7)" text-anchor="end" font-family="${fontFamily}">${escapeXml(date)}</text>
 </svg>`;
 }
 
