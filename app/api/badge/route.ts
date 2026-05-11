@@ -1,17 +1,17 @@
 import { generateBadge } from '@/lib/badge';
 
-export async function GET(request: Request) {
+export function GET() {
   try {
     const jstDate = new Date(
       new Date().toLocaleString('en-US', { timeZone: 'Asia/Tokyo' })
     );
     const hour = jstDate.getHours();
 
-    const imageBuffer = await generateBadge({ hour });
+    const svg = generateBadge({ hour, now: jstDate });
 
-    return new Response(new Uint8Array(imageBuffer), {
+    return new Response(svg, {
       headers: {
-        'Content-Type': 'image/png',
+        'Content-Type': 'image/svg+xml; charset=utf-8',
         'Cache-Control': 'no-cache, no-store, must-revalidate',
         'Pragma': 'no-cache',
         'Expires': '0',

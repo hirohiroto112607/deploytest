@@ -10,13 +10,13 @@
   - 夜 (18:00 - 04:59): 🌙 「こんばんは」
 
 - **ランダムメッセージ**: 各時間帯に複数のメッセージを用意し、ランダムに選択表示
-- **動的画像生成**: Canvas を使用した高速PNG画像生成
+- **動的画像生成**: SVG を文字列で生成
 - **キャッシュ制御**: GitHub のキャッシュを回避する適切なヘッダー設定
 
 ## 技術スタック
 
 - **Framework**: Next.js 16.2.6 (App Router)
-- **Image Generation**: Node.js Canvas
+- **Image Generation**: SVG (string)
 - **Language**: TypeScript
 - **Deployment**: Vercel / Cloudflare Pages
 
@@ -40,7 +40,7 @@ npm run dev
 GET /api/badge
 ```
 
-現在の時刻に応じた PNG 画像を返します。
+現在の時刻に応じた SVG 画像を返します。
 
 ### README.md への埋め込み
 
@@ -77,7 +77,7 @@ GET /api/badge
 
 ### `lib/badge.ts`
 
-- Canvas を使用した PNG 画像生成
+- SVG 画像生成
 - グラデーション背景の描画
 - 時刻、挨拶、メッセージの配置
 
