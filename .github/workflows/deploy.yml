@@ -71,6 +71,7 @@ jobs:
           ssh -i ~/.ssh/deploy_key -p ${{ matrix.port }} -o StrictHostKeyChecking=no \
             user@${{ matrix.host }} \
             "cd ~/apps/GreetingBadge \
+              && rm -rf node_modules \
               && npm ci \
               && PORT=3001 npm run build \
               && if pm2 describe GreetingBadge > /dev/null 2>&1; then \
