@@ -75,10 +75,11 @@ jobs:
           path: .next/
 
       - name: Setup Tailscale
-        uses: tailscale/github-action@v2
+        uses: tailscale/github-action@v4
         with:
-          authkey: ${{ secrets.TAILSCALE_AUTHKEY }}
-          args: "--accept-routes"
+             oauth-client-id: ${{ secrets.TS_OAUTH_CLIENT_ID }}
+             oauth-secret: ${{ secrets.TS_OAUTH_SECRET }}
+             tags: tag:github-actions
 
       - name: Setup SSH
         run: |
