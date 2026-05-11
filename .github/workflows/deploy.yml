@@ -57,6 +57,7 @@ jobs:
           name: next-build
           path: .next/
           retention-days: 1
+          include-hidden-files: true
 
   deploy:
     needs: [prepare, build]
