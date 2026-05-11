@@ -45,7 +45,7 @@ GET /api/badge
 ### README.md への埋め込み
 
 ```markdown
-![Greeting Badge](https://your-domain.com/api/badge?t={TIMESTAMP})
+![Greeting Badge](https://greetingbadge.hirohiroto112607.f5.si/api/badge?t={TIMESTAMP})
 ```
 
 タイムスタンプ(`?t={TIMESTAMP}`)を付けることで、ブラウザとGitHubのキャッシュをより強力に回避できます。
