@@ -36,6 +36,8 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    env:
+      APP_PORT: "3001"
     steps:
       - uses: actions/checkout@v4
 
@@ -49,7 +51,7 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: PORT=3001 npm run build
+        run: PORT=$APP_PORT npm run build
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -62,6 +64,9 @@ jobs:
   deploy:
     needs: [prepare, build]
     runs-on: ubuntu-latest
+    env:
+      APP_NAME: ${{ github.event.repository.name }}
+      APP_PORT: "3001"
     strategy:
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
       fail-fast: false
@@ -83,32 +88,62 @@ jobs:
 
       - name: Setup SSH
         run: |
+          set -Eeuo pipefail
+          trap 'echo "::error::SSH setup failed on line ${LINENO}." >&2' ERR
+
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p ${{ matrix.port }} -H ${{ matrix.host }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          if ! ssh-keyscan -p ${{ matrix.port }} -H ${{ matrix.host }} >> ~/.ssh/known_hosts 2>/dev/null; then
+            echo "::warning::Could not pre-register host key for ${{ matrix.host }}:${{ matrix.port }}. Continuing with StrictHostKeyChecking=no."
+          fi
+
+      - name: Prepare remote directory on ${{ matrix.label }}
+        run: |
+          set -Eeuo pipefail
+          trap 'echo "::error::Failed to prepare remote directory on ${{ matrix.label }} (line ${LINENO})." >&2' ERR
+
+          ssh -i ~/.ssh/deploy_key -p ${{ matrix.port }} -o StrictHostKeyChecking=no \
+            user@${{ matrix.host }} \
+            "set -Eeuo pipefail \
+             && APP_DIR=\"\$HOME/apps/${APP_NAME}\" \
+             && mkdir -p \"\$HOME/apps\" \"\$APP_DIR\""
 
       - name: Transfer source to ${{ matrix.label }}
         run: |
+          set -Eeuo pipefail
+          trap 'echo "::error::Source transfer to ${{ matrix.label }} failed on line ${LINENO}." >&2' ERR
+
           rsync -avz --delete \
             --exclude='.git/' \
             --exclude='node_modules/' \
             -e "ssh -i ~/.ssh/deploy_key -p ${{ matrix.port }} -o StrictHostKeyChecking=no" \
             ./ \
-            user@${{ matrix.host }}:~/apps/GreetingBadge/
+            user@${{ matrix.host }}:~/apps/${APP_NAME}/
 
       - name: Install and restart on ${{ matrix.label }}
         run: |
+          set -Eeuo pipefail
+          trap 'echo "::error::Remote install/restart failed on ${{ matrix.label }} (line ${LINENO})." >&2' ERR
+
           ssh -i ~/.ssh/deploy_key -p ${{ matrix.port }} -o StrictHostKeyChecking=no \
             user@${{ matrix.host }} \
-            "cd ~/apps/GreetingBadge \
-              && npm ci --omit=dev \
-              && if pm2 describe GreetingBadge > /dev/null 2>&1; then \
-                   PORT=3001 pm2 restart GreetingBadge --update-env; \
-                 else \
-                   PORT=3001 pm2 start npm --name GreetingBadge -- start; \
-                 fi \
-              && pm2 save"
+            "set -Eeuo pipefail \
+             && APP_DIR=\"\$HOME/apps/${APP_NAME}\" \
+             && if ! command -v npm >/dev/null 2>&1; then \
+                  echo '[ERROR] npm is not installed on remote host.' >&2; exit 1; \
+                fi \
+             && if ! command -v pm2 >/dev/null 2>&1; then \
+                  echo '[ERROR] pm2 is not installed on remote host. Install it with: npm install -g pm2' >&2; exit 1; \
+                fi \
+             && cd \"\$APP_DIR\" \
+             && npm ci --omit=dev \
+             && if pm2 describe \"${APP_NAME}\" > /dev/null 2>&1; then \
+                  PORT=${APP_PORT} pm2 restart \"${APP_NAME}\" --update-env; \
+                else \
+                  PORT=${APP_PORT} pm2 start npm --name \"${APP_NAME}\" -- start; \
+                fi \
+             && pm2 save"
 
       - name: Write summary
         if: always()
