@@ -41,7 +41,9 @@ interface GitHubEvent {
 // Key format: `${countryCode}-${year}`. Value is a list of YYYY-MM-DD holiday dates.
 // Cache is in-memory for the process lifetime and overwritten yearly/country-wise.
 const holidayCache = new Map<string, string[]>();
+const holidayPendingRequests = new Map<string, Promise<string[]>>();
 const DEFAULT_TIMEOUT_MS = 3000;
+const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 export async function fetchGitHubProfile(
 	username?: string,
@@ -81,7 +83,7 @@ export async function fetchGitHubActivity(
 	}
 
 	const now = Date.now();
-	const sevenDaysAgo = now - 7 * 24 * 60 * 60 * 1000;
+	const sevenDaysAgo = now - SEVEN_DAYS_MS;
 	let recentCommitCount = 0;
 	const activeDays = new Set<string>();
 
@@ -166,17 +168,38 @@ export async function isPublicHoliday(
 
 	let holidays = holidayCache.get(cacheKey);
 	if (!holidays) {
+		const pendingRequest =
+			holidayPendingRequests.get(cacheKey) ??
+			loadHolidayDates(cacheKey, year, normalizedCountry);
+		holidayPendingRequests.set(cacheKey, pendingRequest);
+		holidays = await pendingRequest;
+		holidayCache.set(cacheKey, holidays);
+		holidayPendingRequests.delete(cacheKey);
+	}
+
+	return holidays.includes(dateKey);
+}
+
+async function loadHolidayDates(
+	cacheKey: string,
+	year: number,
+	normalizedCountry: string,
+): Promise<string[]> {
+	try {
 		const data = await fetchJsonWithTimeout<Array<{ date?: string }>>(
 			`https://date.nager.at/api/v3/PublicHolidays/${year}/${normalizedCountry}`,
 			2000,
 		);
-		holidays = Array.isArray(data)
-			? data.map((item) => item.date).filter((value): value is string => Boolean(value))
-			: [];
-		holidayCache.set(cacheKey, holidays);
+		if (!Array.isArray(data)) {
+			return [];
+		}
+		return data
+			.map((item) => item.date)
+			.filter((value): value is string => Boolean(value));
+	} catch {
+		holidayPendingRequests.delete(cacheKey);
+		return [];
 	}
-
-	return holidays.includes(dateKey);
 }
 
 async function fetchJsonWithTimeout<T>(

@@ -3,6 +3,7 @@ type Variant = "A" | "B";
 interface VariantStats {
 	views: number;
 	retained: number;
+	updatedAt: number;
 }
 
 interface LastSeen {
@@ -13,19 +14,23 @@ interface LastSeen {
 // In-memory experiment data (non-persistent). Size is capped to avoid unbounded growth.
 const variantStats = new Map<string, Record<Variant, VariantStats>>();
 const userLastSeen = new Map<string, LastSeen>();
+// A revisit within this window is treated as implicit retention for the shown variant.
 const RETAIN_WINDOW_MS = 10 * 60 * 1000;
 const MAX_EXPERIMENTS = 500;
 const MAX_USERS = 5000;
 
 export function chooseVariant(experimentKey: string, userKey: string): Variant {
 	const now = Date.now();
-	pruneMap(variantStats, MAX_EXPERIMENTS);
-	pruneMap(userLastSeen, MAX_USERS);
+	pruneByTime(variantStats, MAX_EXPERIMENTS, (value) =>
+		Math.min(value.A.updatedAt, value.B.updatedAt),
+	);
+	pruneByTime(userLastSeen, MAX_USERS, (value) => value.timestamp);
 
 	const existing = userLastSeen.get(userKey);
 	if (existing && now - existing.timestamp <= RETAIN_WINDOW_MS) {
 		const stat = getStats(experimentKey, existing.variant);
 		stat.retained += 1;
+		stat.updatedAt = now;
 	}
 
 	const stats = getOrCreateExperiment(experimentKey);
@@ -40,6 +45,7 @@ export function chooseVariant(experimentKey: string, userKey: string): Variant {
 	}
 
 	stats[selected].views += 1;
+	stats[selected].updatedAt = now;
 	userLastSeen.set(userKey, { variant: selected, timestamp: now });
 	return selected;
 }
@@ -58,8 +64,8 @@ function getOrCreateExperiment(key: string): Record<Variant, VariantStats> {
 	}
 
 	const initial: Record<Variant, VariantStats> = {
-		A: { views: 0, retained: 0 },
-		B: { views: 0, retained: 0 },
+		A: { views: 0, retained: 0, updatedAt: Date.now() },
+		B: { views: 0, retained: 0, updatedAt: Date.now() },
 	};
 	variantStats.set(key, initial);
 	return initial;
@@ -69,9 +75,23 @@ function getStats(key: string, variant: Variant): VariantStats {
 	return getOrCreateExperiment(key)[variant];
 }
 
-function pruneMap<T>(map: Map<string, T>, maxSize: number): void {
+function pruneByTime<T>(
+	map: Map<string, T>,
+	maxSize: number,
+	getTimestamp: (value: T) => number,
+): void {
 	while (map.size > maxSize) {
-		const oldestKey = map.keys().next().value;
+		let oldestKey: string | undefined;
+		let oldestTime = Number.POSITIVE_INFINITY;
+
+		for (const [key, value] of map.entries()) {
+			const timestamp = getTimestamp(value);
+			if (timestamp < oldestTime) {
+				oldestTime = timestamp;
+				oldestKey = key;
+			}
+		}
+
 		if (!oldestKey) {
 			break;
 		}

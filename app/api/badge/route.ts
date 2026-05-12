@@ -189,15 +189,24 @@ function detectCountryFromAcceptLanguage(acceptLanguage: string | null): string 
 	if (!acceptLanguage) {
 		return "US";
 	}
-	const primary = acceptLanguage.split(",")[0]?.trim() ?? "";
+	const primary = acceptLanguage.split(",")[0]?.trim().toLowerCase() ?? "";
 	const region = primary.split("-")[1]?.toUpperCase();
 	if (region && /^[A-Z]{2}$/.test(region)) {
 		return region;
 	}
-	if (primary.toLowerCase().startsWith("ja")) {
+	if (primary.startsWith("zh-tw")) {
+		return "TW";
+	}
+	if (primary.startsWith("zh-hk")) {
+		return "HK";
+	}
+	if (primary.startsWith("zh-cn")) {
+		return "CN";
+	}
+	if (primary.startsWith("ja")) {
 		return "JP";
 	}
-	if (primary.toLowerCase().startsWith("zh")) {
+	if (primary.startsWith("zh")) {
 		return "CN";
 	}
 	return "US";
