@@ -78,6 +78,7 @@ export function generateBadge(options: BadgeOptions): string {
 	} = options;
 
 	const palette = themeStyles[theme];
+	const safeFontFamily = escapeXml(fontFamily);
 	const width = 900;
 	const height = 220;
 	const safeRadius = clamp(radius, 0, 28);
@@ -89,14 +90,14 @@ export function generateBadge(options: BadgeOptions): string {
 	const messageText = messageLines
 		.map((line, index) => {
 			const y = 108 + index * 24;
-			return `<text x="${safePadding}" y="${y}" font-size="18" fill="${palette.textColor}" font-family="${escapeXml(fontFamily)}">${escapeXml(line)}</text>`;
+			return `<text x="${safePadding}" y="${y}" font-size="18" fill="${palette.textColor}" font-family="${safeFontFamily}">${escapeXml(line)}</text>`;
 		})
 		.join("");
 
 	const extraInfo = infoLines
 		.map((line, index) => {
 			const y = 162 + index * 18;
-			return `<text x="${safePadding}" y="${y}" font-size="14" fill="${palette.subtleTextColor}" font-family="${escapeXml(fontFamily)}">${escapeXml(line ?? "")}</text>`;
+			return `<text x="${safePadding}" y="${y}" font-size="14" fill="${palette.subtleTextColor}" font-family="${safeFontFamily}">${escapeXml(line ?? "")}</text>`;
 		})
 		.join("");
 
@@ -116,15 +117,15 @@ export function generateBadge(options: BadgeOptions): string {
   </defs>
   <rect width="${width}" height="${height}" rx="${safeRadius}" ry="${safeRadius}" fill="url(#bg)" />
   <line x1="${safePadding}" y1="72" x2="${width - safePadding}" y2="72" stroke="${palette.lineColor}" />
-  <text x="${safePadding}" y="58" font-size="44" font-weight="700" font-family="${escapeXml(fontFamily)}">
+  <text x="${safePadding}" y="58" font-size="44" font-weight="700" font-family="${safeFontFamily}">
     ${escapeXml(icon)}
     <animate attributeName="opacity" values="1;0.82;1" dur="2.5s" repeatCount="indefinite"/>
   </text>
-  <text x="${safePadding + 74}" y="55" font-size="36" font-weight="700" fill="${palette.textColor}" font-family="${escapeXml(fontFamily)}">${escapeXml(greeting)}</text>
+  <text x="${safePadding + 74}" y="55" font-size="36" font-weight="700" fill="${palette.textColor}" font-family="${safeFontFamily}">${escapeXml(greeting)}</text>
   ${messageText}
   ${extraInfo}
-  <text x="${safePadding}" y="${footerY}" font-size="15" fill="${palette.subtleTextColor}" font-family="${escapeXml(fontFamily)}">${escapeXml(`${time} (JST)`)}</text>
-  <text x="${width - safePadding}" y="${footerY}" font-size="15" fill="${palette.subtleTextColor}" text-anchor="end" font-family="${escapeXml(fontFamily)}">${escapeXml(date)}</text>
+  <text x="${safePadding}" y="${footerY}" font-size="15" fill="${palette.subtleTextColor}" font-family="${safeFontFamily}">${escapeXml(`${time} (JST)`)}</text>
+  <text x="${width - safePadding}" y="${footerY}" font-size="15" fill="${palette.subtleTextColor}" text-anchor="end" font-family="${safeFontFamily}">${escapeXml(date)}</text>
 </svg>`;
 }
 

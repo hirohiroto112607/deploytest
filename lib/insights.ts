@@ -38,6 +38,8 @@ interface GitHubEvent {
 	};
 }
 
+// Key format: `${countryCode}-${year}`. Value is a list of YYYY-MM-DD holiday dates.
+// Cache is in-memory for the process lifetime and overwritten yearly/country-wise.
 const holidayCache = new Map<string, string[]>();
 const DEFAULT_TIMEOUT_MS = 3000;
 
@@ -205,4 +207,3 @@ async function fetchJsonWithTimeout<T>(
 		clearTimeout(timeoutId);
 	}
 }
-

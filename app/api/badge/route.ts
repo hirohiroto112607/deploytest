@@ -43,11 +43,11 @@ export async function GET(request: NextRequest) {
 		);
 		const mode = resolveContextMode(jstDate, searchParams.get("mode"));
 
-		const country = sanitizeCountry(searchParams.get("country")) ?? "JP";
+		const country =
+			sanitizeCountry(searchParams.get("country")) ??
+			detectCountryFromAcceptLanguage(request.headers.get("accept-language"));
 		const birthday = sanitizeBirthday(searchParams.get("birthday"));
-		const isBirthday = birthday
-			? birthday === `${String(jstDate.getMonth() + 1).padStart(2, "0")}-${String(jstDate.getDate()).padStart(2, "0")}`
-			: false;
+		const isBirthday = isBirthdayToday(jstDate, birthday);
 
 		const [profile, activity, holiday] = await Promise.all([
 			fetchGitHubProfile(username),
@@ -163,6 +163,14 @@ function sanitizeBirthday(value: string | null): string | undefined {
 	return /^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/.test(value) ? value : undefined;
 }
 
+function isBirthdayToday(date: Date, birthday: string | undefined): boolean {
+	if (!birthday) {
+		return false;
+	}
+	const today = `${String(date.getMonth() + 1).padStart(2, "0")}-${String(date.getDate()).padStart(2, "0")}`;
+	return birthday === today;
+}
+
 function sanitizeFont(value: string | null): string | undefined {
 	if (!value || value.length > 120) {
 		return undefined;
@@ -175,6 +183,24 @@ function parseEventType(value: string | null): SpecialEventType | undefined {
 		return value;
 	}
 	return undefined;
+}
+
+function detectCountryFromAcceptLanguage(acceptLanguage: string | null): string {
+	if (!acceptLanguage) {
+		return "US";
+	}
+	const primary = acceptLanguage.split(",")[0]?.trim() ?? "";
+	const region = primary.split("-")[1]?.toUpperCase();
+	if (region && /^[A-Z]{2}$/.test(region)) {
+		return region;
+	}
+	if (primary.toLowerCase().startsWith("ja")) {
+		return "JP";
+	}
+	if (primary.toLowerCase().startsWith("zh")) {
+		return "CN";
+	}
+	return "US";
 }
 
 function buildProfileLine(

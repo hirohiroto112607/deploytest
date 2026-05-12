@@ -10,12 +10,18 @@ interface LastSeen {
 	timestamp: number;
 }
 
+// In-memory experiment data (non-persistent). Size is capped to avoid unbounded growth.
 const variantStats = new Map<string, Record<Variant, VariantStats>>();
 const userLastSeen = new Map<string, LastSeen>();
 const RETAIN_WINDOW_MS = 10 * 60 * 1000;
+const MAX_EXPERIMENTS = 500;
+const MAX_USERS = 5000;
 
 export function chooseVariant(experimentKey: string, userKey: string): Variant {
 	const now = Date.now();
+	pruneMap(variantStats, MAX_EXPERIMENTS);
+	pruneMap(userLastSeen, MAX_USERS);
+
 	const existing = userLastSeen.get(userKey);
 	if (existing && now - existing.timestamp <= RETAIN_WINDOW_MS) {
 		const stat = getStats(experimentKey, existing.variant);
@@ -63,3 +69,12 @@ function getStats(key: string, variant: Variant): VariantStats {
 	return getOrCreateExperiment(key)[variant];
 }
 
+function pruneMap<T>(map: Map<string, T>, maxSize: number): void {
+	while (map.size > maxSize) {
+		const oldestKey = map.keys().next().value;
+		if (!oldestKey) {
+			break;
+		}
+		map.delete(oldestKey);
+	}
+}
