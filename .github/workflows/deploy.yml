@@ -13,6 +13,25 @@ on:
         description: "Application port used for build/start"
         required: false
         default: "3001"
+  workflow_call:
+    inputs:
+      target:
+        description: "Deploy target (all / aquos / pixel7a / tone)"
+        required: false
+        type: string
+        default: "aquos"
+      app_port:
+        description: "Application port used for build/start"
+        required: false
+        type: string
+        default: "3001"
+    secrets:
+      TS_OAUTH_CLIENT_ID:
+        required: true
+      TS_OAUTH_SECRET:
+        required: true
+      DEPLOY_SSH_KEY:
+        required: true
 
 jobs:
   prepare:
@@ -23,7 +42,7 @@ jobs:
       - id: gen
         shell: bash
         run: |
-          TARGET="${{ github.event.inputs.target || 'aquos' }}"
+          TARGET="${{ github.event.inputs.target || inputs.target || 'aquos' }}"
 
           AQUOS='{"name":"aquos","host":"100.89.12.118","port":"8022","label":"AQUOS Sense3"}'
           PIXEL='{"name":"pixel7a","host":"100.87.78.4","port":"8022","label":"Pixel 7a"}'
@@ -41,7 +60,7 @@ jobs:
   build:
     runs-on: ubuntu-latest
     env:
-      APP_PORT: ${{ github.event.inputs.app_port || vars.APP_PORT || '3001' }}
+      APP_PORT: ${{ github.event.inputs.app_port || inputs.app_port || vars.APP_PORT || '3001' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -70,7 +89,7 @@ jobs:
     runs-on: ubuntu-latest
     env:
       APP_NAME_RAW: ${{ github.event.repository.name }}
-      APP_PORT: ${{ github.event.inputs.app_port || vars.APP_PORT || '3001' }}
+      APP_PORT: ${{ github.event.inputs.app_port || inputs.app_port || vars.APP_PORT || '3001' }}
     strategy:
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
       fail-fast: false
