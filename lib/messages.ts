@@ -108,22 +108,82 @@ const baseMessages: Record<Language, Record<TimeSlotName, string[]>> = {
 
 const modeMessages: Record<Language, Record<ContextMode, string[]>> = {
 	ja: {
-		workday: ["平日モードで着実に積み上げましょう。"],
-		holiday: ["休日モード。無理せずゆるく進めましょう。"],
-		"early-bird": ["朝活モード、集中できる時間を活かしましょう。"],
-		"night-owl": ["深夜モード。重要変更は明朝に再確認がおすすめです。"],
+		workday: [
+			"平日モードで着実に積み上げましょう。",
+			"タスクを着実にこなしていく、良い日ですね。",
+			"ビジネスタイム、効率重視でいきましょう。",
+			"本日のタスクリストの進捗はいかがですか？",
+		],
+		holiday: [
+			"休日モード。無理せずゆるく進めましょう。",
+			"今日は好きな機能の開発に没頭するチャンスです。",
+			"自分のペースで、リラックスしてコードを書きましょう。",
+			"休日こそ、新しい技術を試す絶好の機会です。",
+		],
+		"early-bird": [
+			"朝活モード、集中できる時間を活かしましょう。",
+			"早起きは三文の徳、静かな時間に深い考察を。",
+			"朝日と共に頭もクリアに、生産性が高い時間です。",
+			"一日のスタートダッシュ、素晴らしい判断です。",
+		],
+		"night-owl": [
+			"深夜モード。重要変更は明朝に再確認がおすすめです。",
+			"静寂の中のコーディング、ゾーンに入りやすいですね。",
+			"アイディアが湧く時間ですが、体調には気をつけて。",
+			"深夜のコードは、明日読み返すと驚くほど改善できるかも。",
+		],
 	},
 	en: {
-		workday: ["Weekday mode: steady progress wins."],
-		holiday: ["Holiday mode: keep it light and healthy."],
-		"early-bird": ["Early-bird mode: high-focus window is open."],
-		"night-owl": ["Night-owl mode: re-check major changes tomorrow."],
+		workday: [
+			"Weekday mode: steady progress wins.",
+			"A perfect day for consistent development.",
+			"Business mode enabled—let's maximize efficiency.",
+			"How's the task list looking for today?",
+		],
+		holiday: [
+			"Holiday mode: keep it light and creative.",
+			"Great time for personal projects or experiments.",
+			"Take it slow, write code at your own pace.",
+			"Nothing beats a relaxed coding session on a day off.",
+		],
+		"early-bird": [
+			"Early-bird mode: high-focus window is open.",
+			"The early bird gets the clean code.",
+			"Peaceful morning hours—the perfect time for deep work.",
+			"Starting the day strong with some morning commits.",
+		],
+		"night-owl": [
+			"Night-owl mode: re-check major changes tomorrow.",
+			"Silence and code—the developer's playground.",
+			"Great for creative spikes, but remember to sleep.",
+			"Late-night discoveries are valuable, but audit them in daylight.",
+		],
 	},
 	zh: {
-		workday: ["工作日模式：稳定推进最重要。"],
-		holiday: ["假日模式：轻量开发，注意休息。"],
-		"early-bird": ["早起模式：抓住高专注时间段。"],
-		"night-owl": ["夜猫子模式：重要改动建议明早复查。"],
+		workday: [
+			"工作日模式：稳定推进最重要。",
+			"开启高效办公模式，处理今日任务清单。",
+			"节奏感良好，继续保持工作的推进速度。",
+			"今天也是充实的一天，加油！",
+		],
+		holiday: [
+			"假日模式：轻量开发，享受 coding 乐趣。",
+			"假期非常适合研究那些平时没空看的项目。",
+			"按照自己的节奏来，轻松敲出每一行代码。",
+			"假期开发不设限，灵感随时迸发。",
+		],
+		"early-bird": [
+			"早起模式：抓住高专注时间段。",
+			"晨间专注力爆棚，完成复杂问题的最佳时机。",
+			"静谧的清晨是思维最活跃的时候。",
+			"起个大早，领先今天一步。",
+		],
+		"night-owl": [
+			"夜猫子模式：重要改动建议明早复查。",
+			"静谧夜色中，代码敲击声格外清晰。",
+			"深夜灵感虽多，但请记得注意休息。",
+			"晚间提交很有成就感，记得清晨再次回顾确认。",
+		],
 	},
 };
 
@@ -150,10 +210,16 @@ export function getMessageCandidates(
 	mode: ContextMode,
 ): string[] {
 	const slot = getTimeSlot(hour);
-	return [...baseMessages[language][slot.name], ...modeMessages[language][mode]];
+	return [
+		...baseMessages[language][slot.name],
+		...modeMessages[language][mode],
+	];
 }
 
-export function selectMessageByVariant(messages: string[], variant: "A" | "B"): string {
+export function selectMessageByVariant(
+	messages: string[],
+	variant: "A" | "B",
+): string {
 	if (messages.length === 0) {
 		return "";
 	}
@@ -184,7 +250,10 @@ export function detectLanguage(
 	return "en";
 }
 
-export function resolveContextMode(date: Date, modeParam: string | null): ContextMode {
+export function resolveContextMode(
+	date: Date,
+	modeParam: string | null,
+): ContextMode {
 	if (
 		modeParam === "workday" ||
 		modeParam === "holiday" ||
@@ -237,7 +306,8 @@ export function formatTime(date: Date): string {
 }
 
 export function formatDate(date: Date, language: Language): string {
-	const locale = language === "ja" ? "ja-JP" : language === "zh" ? "zh-CN" : "en-US";
+	const locale =
+		language === "ja" ? "ja-JP" : language === "zh" ? "zh-CN" : "en-US";
 	return new Intl.DateTimeFormat(locale, {
 		weekday: "short",
 		month: "short",

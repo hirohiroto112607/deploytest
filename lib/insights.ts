@@ -52,9 +52,11 @@ export async function fetchGitHubProfile(
 		return null;
 	}
 
-	const data = await fetchJsonWithTimeout<{ login?: string; name?: string; bio?: string }>(
-		`https://api.github.com/users/${encodeURIComponent(username)}`,
-	);
+	const data = await fetchJsonWithTimeout<{
+		login?: string;
+		name?: string;
+		bio?: string;
+	}>(`https://api.github.com/users/${encodeURIComponent(username)}`);
 
 	if (!data?.login) {
 		return null;
@@ -88,9 +90,17 @@ export async function fetchGitHubActivity(
 	const activeDays = new Set<string>();
 
 	for (const event of events) {
-		const createdAt = event.created_at ? new Date(event.created_at).getTime() : NaN;
-		if (Number.isFinite(createdAt) && createdAt >= sevenDaysAgo && event.type === "PushEvent") {
-			const commits = Array.isArray(event.payload?.commits) ? event.payload.commits.length : 0;
+		const createdAt = event.created_at
+			? new Date(event.created_at).getTime()
+			: NaN;
+		if (
+			Number.isFinite(createdAt) &&
+			createdAt >= sevenDaysAgo &&
+			event.type === "PushEvent"
+		) {
+			const commits = Array.isArray(event.payload?.commits)
+				? event.payload.commits.length
+				: 0;
 			recentCommitCount += commits;
 		}
 
@@ -105,16 +115,23 @@ export async function fetchGitHubActivity(
 	return { recentCommitCount, streakDays, latestEvent };
 }
 
-function findLatestSpecialEvent(events: GitHubEvent[]): SpecialEvent | undefined {
+function findLatestSpecialEvent(
+	events: GitHubEvent[],
+): SpecialEvent | undefined {
 	for (const event of events) {
 		const createdAt = event.created_at;
 		if (!createdAt) {
 			continue;
 		}
 
-		if (event.type === "ReleaseEvent" && event.payload?.action === "published") {
+		if (
+			event.type === "ReleaseEvent" &&
+			event.payload?.action === "published"
+		) {
 			const releaseName =
-				event.payload.release?.name ?? event.payload.release?.tag_name ?? "New release";
+				event.payload.release?.name ??
+				event.payload.release?.tag_name ??
+				"New release";
 			return { type: "release", title: releaseName, createdAt };
 		}
 

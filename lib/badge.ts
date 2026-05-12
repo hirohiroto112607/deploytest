@@ -84,8 +84,18 @@ export function generateBadge(options: BadgeOptions): string {
 	const safeRadius = clamp(radius, 0, 28);
 	const safePadding = clamp(padding, 20, 48);
 	const messageMaxChars = 42;
-	const messageLines = clampLines(wrapTextByChar(message, messageMaxChars), 2, messageMaxChars);
-	const infoLines = [profileLine, activityLine, eventLine, modeLine, seasonalLine].filter(Boolean);
+	const messageLines = clampLines(
+		wrapTextByChar(message, messageMaxChars),
+		2,
+		messageMaxChars,
+	);
+	const infoLines = [
+		profileLine,
+		activityLine,
+		eventLine,
+		modeLine,
+		seasonalLine,
+	].filter(Boolean);
 
 	const messageText = messageLines
 		.map((line, index) => {

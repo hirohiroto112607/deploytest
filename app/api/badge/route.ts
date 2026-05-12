@@ -1,5 +1,10 @@
+import type { NextRequest } from "next/server";
 import { chooseVariant } from "@/lib/ab";
-import { generateBadge, generateFallbackBadge, type ThemePreset } from "@/lib/badge";
+import {
+	generateBadge,
+	generateFallbackBadge,
+	type ThemePreset,
+} from "@/lib/badge";
 import {
 	fetchGitHubActivity,
 	fetchGitHubProfile,
@@ -17,7 +22,6 @@ import {
 	resolveContextMode,
 	selectMessageByVariant,
 } from "@/lib/messages";
-import type { NextRequest } from "next/server";
 
 export async function GET(request: NextRequest) {
 	const headers: Record<string, string> = {
@@ -62,23 +66,40 @@ export async function GET(request: NextRequest) {
 			activity?.latestEvent?.title,
 			language,
 		);
-		const seasonalLine = buildSeasonalLine(language, holiday || isBirthday, isBirthday);
+		const seasonalLine = buildSeasonalLine(
+			language,
+			holiday || isBirthday,
+			isBirthday,
+		);
 		const activityLine =
 			username && activity
-				? buildActivityLine(language, activity.recentCommitCount, activity.streakDays)
+				? buildActivityLine(
+						language,
+						activity.recentCommitCount,
+						activity.streakDays,
+					)
 				: undefined;
 		const profileLine =
 			username && profile
-				? buildProfileLine(profile.name, profile.login, profile.bio ?? "", language)
+				? buildProfileLine(
+						profile.name,
+						profile.login,
+						profile.bio ?? "",
+						language,
+					)
 				: undefined;
 		const greeting = getGreeting(hour, language);
 		const icon = getIcon(hour);
 		const modeLine = getModeLabel(mode, language);
 
-		const experimentKey = [language, mode, eventType ?? "none", hour < 12 ? "am" : "pm"].join(
-			":",
-		);
-		const userKey = username ?? request.headers.get("x-forwarded-for") ?? "anonymous";
+		const experimentKey = [
+			language,
+			mode,
+			eventType ?? "none",
+			hour < 12 ? "am" : "pm",
+		].join(":");
+		const userKey =
+			username ?? request.headers.get("x-forwarded-for") ?? "anonymous";
 		const variant = chooseVariant(experimentKey, userKey);
 		const message = selectMessageByVariant(
 			getMessageCandidates(hour, language, mode),
@@ -116,11 +137,18 @@ export async function GET(request: NextRequest) {
 }
 
 function getJstDate(): Date {
-	return new Date(new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }));
+	return new Date(
+		new Date().toLocaleString("en-US", { timeZone: "Asia/Tokyo" }),
+	);
 }
 
 function parseTheme(themeParam: string | null): ThemePreset {
-	if (themeParam === "default" || themeParam === "neon" || themeParam === "minimal" || themeParam === "retro") {
+	if (
+		themeParam === "default" ||
+		themeParam === "neon" ||
+		themeParam === "minimal" ||
+		themeParam === "retro"
+	) {
 		return themeParam;
 	}
 	return "default";
@@ -160,7 +188,9 @@ function sanitizeBirthday(value: string | null): string | undefined {
 	if (!value) {
 		return undefined;
 	}
-	return /^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/.test(value) ? value : undefined;
+	return /^(0[1-9]|1[0-2])-(0[1-9]|[12][0-9]|3[01])$/.test(value)
+		? value
+		: undefined;
 }
 
 function isBirthdayToday(date: Date, birthday: string | undefined): boolean {
@@ -185,7 +215,9 @@ function parseEventType(value: string | null): SpecialEventType | undefined {
 	return undefined;
 }
 
-function detectCountryFromAcceptLanguage(acceptLanguage: string | null): string {
+function detectCountryFromAcceptLanguage(
+	acceptLanguage: string | null,
+): string {
 	if (!acceptLanguage) {
 		return "US";
 	}
@@ -222,7 +254,8 @@ function buildProfileLine(
 	if (!bio) {
 		return displayName;
 	}
-	const prefix = language === "ja" ? "プロフィール" : language === "zh" ? "简介" : "Profile";
+	const prefix =
+		language === "ja" ? "プロフィール" : language === "zh" ? "简介" : "Profile";
 	return `${prefix}: ${displayName} — ${truncate(bio, 42)}`;
 }
 
