@@ -9,6 +9,10 @@ on:
         description: "Deploy target (all / aquos / pixel7a / tone)"
         required: false
         default: "aquos"
+      app_port:
+        description: "Application port used for build/start"
+        required: false
+        default: "3001"
 
 jobs:
   prepare:
@@ -36,6 +40,8 @@ jobs:
 
   build:
     runs-on: ubuntu-latest
+    env:
+      APP_PORT: ${{ github.event.inputs.app_port || vars.APP_PORT || '3001' }}
     steps:
       - uses: actions/checkout@v4
 
@@ -49,7 +55,7 @@ jobs:
         run: npm ci
 
       - name: Build
-        run: PORT=3001 npm run build
+        run: PORT=$APP_PORT npm run build
 
       - name: Upload build artifact
         uses: actions/upload-artifact@v4
@@ -62,6 +68,9 @@ jobs:
   deploy:
     needs: [prepare, build]
     runs-on: ubuntu-latest
+    env:
+      APP_NAME_RAW: ${{ github.event.repository.name }}
+      APP_PORT: ${{ github.event.inputs.app_port || vars.APP_PORT || '3001' }}
     strategy:
       matrix: ${{ fromJson(needs.prepare.outputs.matrix) }}
       fail-fast: false
@@ -83,32 +92,84 @@ jobs:
 
       - name: Setup SSH
         run: |
+          set -Eeuo pipefail
+          trap 'echo "::error::SSH setup failed on line ${LINENO}." >&2' ERR
+
           mkdir -p ~/.ssh
           echo "${{ secrets.DEPLOY_SSH_KEY }}" > ~/.ssh/deploy_key
           chmod 600 ~/.ssh/deploy_key
-          ssh-keyscan -p ${{ matrix.port }} -H ${{ matrix.host }} >> ~/.ssh/known_hosts 2>/dev/null || true
+          ssh-keyscan -p ${{ matrix.port }} -H ${{ matrix.host }} >> ~/.ssh/known_hosts
+
+      - name: Resolve app settings
+        id: app_config
+        run: |
+          set -Eeuo pipefail
+          trap 'echo "::error::Failed to resolve app settings on line ${LINENO}." >&2' ERR
+
+          APP_NAME=$(echo "${APP_NAME_RAW}" | tr '[:upper:]' '[:lower:]' | sed -E 's/[^a-z0-9-]+/-/g; s/^-+//; s/-+$//')
+          if [ -z "$APP_NAME" ]; then
+            echo "::error::Repository name '${APP_NAME_RAW}' cannot be converted into a valid app name."
+            exit 1
+          fi
+
+          if ! [[ "${APP_PORT}" =~ ^[0-9]+$ ]]; then
+            echo "::error::APP_PORT must be numeric, but got '${APP_PORT}'."
+            exit 1
+          fi
+
+          echo "app_name=$APP_NAME" >> "$GITHUB_OUTPUT"
+          echo "app_port=${APP_PORT}" >> "$GITHUB_OUTPUT"
+
+      - name: Prepare remote directory on ${{ matrix.label }}
+        run: |
+          set -Eeuo pipefail
+          trap 'echo "::error::Failed to prepare remote directory on ${{ matrix.label }} (line ${LINENO})." >&2' ERR
+          APP_NAME="${{ steps.app_config.outputs.app_name }}"
+
+          ssh -i ~/.ssh/deploy_key -p ${{ matrix.port }} -o StrictHostKeyChecking=yes \
+            user@${{ matrix.host }} \
+            "set -Eeuo pipefail \
+             && APP_DIR=\"\$HOME/apps/${APP_NAME}\" \
+             && mkdir -p \"\$HOME/apps\" \"\$APP_DIR\""
 
       - name: Transfer source to ${{ matrix.label }}
         run: |
+          set -Eeuo pipefail
+          trap 'echo "::error::Source transfer to ${{ matrix.label }} failed on line ${LINENO}." >&2' ERR
+          APP_NAME="${{ steps.app_config.outputs.app_name }}"
+
           rsync -avz --delete \
             --exclude='.git/' \
             --exclude='node_modules/' \
-            -e "ssh -i ~/.ssh/deploy_key -p ${{ matrix.port }} -o StrictHostKeyChecking=no" \
+            -e "ssh -i ~/.ssh/deploy_key -p ${{ matrix.port }} -o StrictHostKeyChecking=yes" \
             ./ \
-            user@${{ matrix.host }}:~/apps/GreetingBadge/
+            user@${{ matrix.host }}:~/apps/${APP_NAME}/
 
       - name: Install and restart on ${{ matrix.label }}
         run: |
-          ssh -i ~/.ssh/deploy_key -p ${{ matrix.port }} -o StrictHostKeyChecking=no \
+          set -Eeuo pipefail
+          trap 'echo "::error::Remote install/restart failed on ${{ matrix.label }} (line ${LINENO})." >&2' ERR
+          APP_NAME="${{ steps.app_config.outputs.app_name }}"
+          APP_PORT="${{ steps.app_config.outputs.app_port }}"
+
+          ssh -i ~/.ssh/deploy_key -p ${{ matrix.port }} -o StrictHostKeyChecking=yes \
             user@${{ matrix.host }} \
-            "cd ~/apps/GreetingBadge \
-              && npm ci --omit=dev \
-              && if pm2 describe GreetingBadge > /dev/null 2>&1; then \
-                   PORT=3001 pm2 restart GreetingBadge --update-env; \
-                 else \
-                   PORT=3001 pm2 start npm --name GreetingBadge -- start; \
-                 fi \
-              && pm2 save"
+            "set -Eeuo pipefail \
+             && APP_DIR=\"\$HOME/apps/${APP_NAME}\" \
+             && if ! command -v npm >/dev/null 2>&1; then \
+                  echo '[ERROR] npm is not installed on remote host. Install Node.js from https://nodejs.org/ and retry.' >&2; exit 1; \
+                fi \
+             && if ! command -v pm2 >/dev/null 2>&1; then \
+                  echo '[ERROR] pm2 is not installed on remote host. Install it with: npm install -g pm2' >&2; exit 1; \
+                fi \
+             && cd \"\$APP_DIR\" \
+             && npm ci --omit=dev \
+             && if pm2 describe \"${APP_NAME}\" > /dev/null 2>&1; then \
+                  PORT=${APP_PORT} pm2 restart \"${APP_NAME}\" --update-env; \
+                else \
+                  PORT=${APP_PORT} pm2 start npm --name \"${APP_NAME}\" -- start; \
+                fi \
+             && pm2 save"
 
       - name: Write summary
         if: always()
