@@ -77,6 +77,46 @@ GET /api/badge
 ![Advanced Badge](https://greetingbadge.hirohiroto112607.f5.si/api/badge?username=octocat&lang=auto&theme=retro&country=JP&birthday=12-24&t={TIMESTAMP})
 ```
 
+### デプロイワークフローをテンプレートとして使う（Reusable Workflow）
+
+このリポジトリの `.github/workflows/deploy.yml` は `workflow_call` に対応しているため、他リポジトリから再利用できます。
+
+呼び出し元リポジトリで、以下のようなワークフローを作成してください。
+
+```yaml
+name: Reuse Deploy Workflow
+
+on:
+  workflow_dispatch:
+    inputs:
+      target:
+        description: "Deploy target (all / aquos / pixel7a / tone)"
+        required: false
+        default: "aquos"
+      app_port:
+        description: "Application port used for build/start"
+        required: false
+        default: "3001"
+
+jobs:
+  deploy:
+    uses: hirohiroto112607/deploytest/.github/workflows/deploy.yml@main
+    with:
+      target: ${{ github.event.inputs.target }}
+      app_port: ${{ github.event.inputs.app_port }}
+    secrets: inherit
+```
+
+#### 必須シークレット
+
+呼び出し元で、少なくとも以下を利用可能にしてください。
+
+- `TS_OAUTH_CLIENT_ID`
+- `TS_OAUTH_SECRET`
+- `DEPLOY_SSH_KEY`
+
+`secrets: inherit` を使う場合、呼び出し元リポジトリ（または Organization）側で同名シークレットが設定されている必要があります。
+
 ## プロジェクト構成
 
 ```
