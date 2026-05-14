@@ -1,0 +1,35 @@
+name: PR Trust Guard
+
+on:
+  pull_request_target:
+    branches: [main]
+    types: [opened, reopened, synchronize, ready_for_review, edited]
+
+jobs:
+  trust-check:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - name: Block third-party PRs
+        env:
+          AUTHOR_ASSOCIATION: ${{ github.event.pull_request.author_association }}
+          IS_FORK: ${{ github.event.pull_request.head.repo.fork }}
+          HEAD_REPO: ${{ github.event.pull_request.head.repo.full_name }}
+          BASE_REPO: ${{ github.repository }}
+        run: |
+          set -Eeuo pipefail
+
+          TRUSTED_AUTHOR=false
+          case "${AUTHOR_ASSOCIATION}" in
+            OWNER|MEMBER|COLLABORATOR) TRUSTED_AUTHOR=true ;;
+          esac
+
+          if [ "${IS_FORK}" = "true" ] || [ "${HEAD_REPO}" != "${BASE_REPO}" ] || [ "${TRUSTED_AUTHOR}" != "true" ]; then
+            echo "::error::Third-party PRs are not allowed to merge into main."
+            echo "::error::author_association=${AUTHOR_ASSOCIATION}, is_fork=${IS_FORK}, head_repo=${HEAD_REPO}, base_repo=${BASE_REPO}"
+            exit 1
+          fi
+
+          echo "Trusted PR source. Merge to main is allowed."

@@ -117,6 +117,16 @@ jobs:
 
 `secrets: inherit` を使う場合、呼び出し元リポジトリ（または Organization）側で同名シークレットが設定されている必要があります。
 
+### main ブランチ保護（第三者PRのマージ防止）
+
+このリポジトリには `.github/workflows/pr-trust-guard.yml`（`PR Trust Guard`）があり、`main` 向けPRが以下の条件を満たさない場合に失敗します。
+
+- PR作成者の `author_association` が `OWNER / MEMBER / COLLABORATOR` でない
+- fork 由来PR、または head リポジトリが本体リポジトリと異なる
+
+GitHub の **Branch protection rule** で `main` に対し、`PR Trust Guard` を **Required status check** に設定してください。  
+これにより、第三者PRは `main` にマージできなくなり、結果として第三者PR由来の変更で本番デプロイされることを防げます。
+
 ## プロジェクト構成
 
 ```
