@@ -122,7 +122,8 @@ jobs:
 このリポジトリには `.github/workflows/pr-trust-guard.yml`（`PR Trust Guard`）があり、`main` 向けPRが以下の条件を満たさない場合に失敗します。
 
 - PR作成者の `author_association` が `OWNER / MEMBER / COLLABORATOR` でない
-- fork 由来PR、または head リポジトリが本体リポジトリと異なる
+
+`head` 側リポジトリ情報（forkかどうか等）はログ出力されるため、判定結果の監査にも使えます。
 
 GitHub の **Branch protection rule** で `main` に対し、`PR Trust Guard` を **Required status check** に設定してください。  
 これにより、第三者PRは `main` にマージできなくなり、結果として第三者PR由来の変更で本番デプロイされることを防げます。
