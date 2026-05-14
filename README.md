@@ -123,8 +123,6 @@ jobs:
 
 - PR作成者の `author_association` が `OWNER / MEMBER / COLLABORATOR` でない
 
-`head` 側リポジトリ情報（forkかどうか等）はログ出力されるため、判定結果の監査にも使えます。
-
 GitHub の **Branch protection rule** で `main` に対し、`PR Trust Guard` を **Required status check** に設定してください。  
 これにより、第三者PRは `main` にマージできなくなり、結果として第三者PR由来の変更で本番デプロイされることを防げます。
 
